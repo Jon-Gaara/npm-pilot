@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "./design-tokens.css";
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background-color: var(--color-paper-0);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--color-accent-surface);
+  color: var(--color-accent-bright);
+}
+

@@ -1,0 +1,105 @@
+/* Hallmark · macrostructure: Workbench · tone: technical · anchor hue: emerald
+ * Pre-emit critique: P4 H4 E5 S5 R5 V5 */
+
+@theme {
+  /* Paper — three-tier depth */
+  --color-paper-0: #0a0a0c;
+  --color-paper-1: #121214;
+  --color-paper-2: #1a1a1e;
+  --color-paper-3: #222226;
+  --color-paper-4: #2a2a2e;
+
+  /* Borders */
+  --color-border-0: #27272a;
+  --color-border-1: #3f3f46;
+  --color-border-2: #52525b;
+
+  /* Text */
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #a1a1aa;
+  --color-text-tertiary: #71717a;
+  --color-text-quaternary: #52525b;
+
+  /* Accent — emerald (developer-tool green) */
+  --color-accent: #34d399;
+  --color-accent-dim: #10b981;
+  --color-accent-bright: #6ee7b7;
+  --color-accent-surface: #052e16;
+  --color-accent-border: #166534;
+
+  /* Amber — warning/major */
+  --color-warn: #fbbf24;
+  --color-warn-dim: #d97706;
+  --color-warn-surface: #422006;
+  --color-warn-border: #78350f;
+
+  /* Red — danger/error */
+  --color-danger: #f87171;
+  --color-danger-dim: #ef4444;
+  --color-danger-surface: #450a0a;
+  --color-danger-border: #7f1d1d;
+
+  /* Blue — info */
+  --color-info: #60a5fa;
+  --color-info-dim: #3b82f6;
+  --color-info-surface: #172554;
+
+  /* Spacing — 4pt scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Typography */
+  --font-ui: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", "Fira Code", monospace;
+
+  /* Text sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 100ms;
+  --dur-normal: 150ms;
+  --dur-slow: 200ms;
+}
+
+/* Focus ring utility */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-0);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-1);
+}
