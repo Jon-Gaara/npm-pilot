@@ -21,19 +21,23 @@ pub fn extract_blocked_package(line: &str) -> Option<String> {
     Some(name.to_string())
 }
 
-#[tauri::command]
-pub fn get_allow_scripts() -> Result<String, String> {
-    let mut cmd = std::process::Command::new("npm");
+fn get_allow_scripts_value(npm_cmd: &str) -> Result<String, String> {
+    let mut cmd = std::process::Command::new(npm_cmd);
     cmd.args(["config", "get", "allow-scripts", "--location=user"]);
     hide_console_std(&mut cmd);
     let output = cmd.output()
         .map_err(|e| format!("Failed to read npm config: {}", e))?;
-    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(value)
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn is_allowed(pkg: &str) -> bool {
-    let value = match get_allow_scripts() {
+#[tauri::command]
+pub fn get_allow_scripts(state: State<'_, AppState>) -> Result<String, String> {
+    let npm = state.npm_cmd.lock().unwrap().clone();
+    get_allow_scripts_value(&npm)
+}
+
+fn is_allowed(pkg: &str, npm_cmd: &str) -> bool {
+    let value = match get_allow_scripts_value(npm_cmd) {
         Ok(v) => v,
         Err(_) => return false,
     };
@@ -77,12 +81,13 @@ pub async fn check_install_scripts(
     version: Option<String>,
 ) -> Result<ScriptCheck, String> {
     let state = app.state::<AppState>();
+    let npm = state.npm_cmd.lock().unwrap().clone();
     let spec = match &version {
         Some(v) if !v.is_empty() => format!("{}@{}", pkg, v),
         _ => pkg.clone(),
     };
 
-    if is_allowed(&pkg) {
+    if is_allowed(&pkg, &npm) {
         return Ok(ScriptCheck { has_scripts: true, allowed: true });
     }
 
@@ -102,12 +107,13 @@ pub async fn check_install_scripts(
 }
 
 #[tauri::command]
-pub fn add_allow_scripts(_state: State<'_, AppState>, pkg: String) -> Result<(), String> {
+pub fn add_allow_scripts(state: State<'_, AppState>, pkg: String) -> Result<(), String> {
     if pkg.trim().is_empty() {
         return Err("Package name cannot be empty".into());
     }
+    let npm = state.npm_cmd.lock().unwrap().clone();
 
-    let mut get = std::process::Command::new("npm");
+    let mut get = std::process::Command::new(&npm);
     get.args(["config", "get", "allow-scripts", "--location=user"]);
     crate::npm::hide_console_std(&mut get);
     let current = get.output()
@@ -126,7 +132,7 @@ pub fn add_allow_scripts(_state: State<'_, AppState>, pkg: String) -> Result<(),
 
     let new_value = items.join(",");
 
-    let mut set = std::process::Command::new("npm");
+    let mut set = std::process::Command::new(&npm);
     set.args(["config", "set", &format!("allow-scripts={}", new_value), "--location=user"]);
     crate::npm::hide_console_std(&mut set);
     let set = set.output()
