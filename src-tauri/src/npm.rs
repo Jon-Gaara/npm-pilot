@@ -3,6 +3,26 @@ use tokio::process::Command;
 use tauri::{AppHandle, Emitter};
 use crate::types::LogPayload;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[cfg(windows)]
+pub fn hide_console(cmd: &mut Command) {
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+pub fn hide_console(_cmd: &mut Command) {}
+
+#[cfg(windows)]
+pub fn hide_console_std(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+pub fn hide_console_std(_cmd: &mut std::process::Command) {}
+
 pub fn find_npm_executable() -> Result<String, String> {
     for candidate in &["npm.cmd", "npm"] {
         if let Ok(path) = which::which(candidate) {
@@ -30,14 +50,18 @@ pub async fn run_npm_streamed(
     cwd: &str,
     args: &[&str],
 ) -> Result<(), String> {
-    let mut child = Command::new("cmd")
-        .args(["/C", npm_cmd])
+    let mut child = Command::new("cmd");
+    child.args(["/C", npm_cmd])
         .args(args)
         .current_dir(cwd)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .env("NO_COLOR", "1")
-        .spawn()
+        .env("NO_COLOR", "1");
+
+    #[cfg(windows)]
+    hide_console(&mut child);
+
+    let mut child = child.spawn()
         .map_err(|e| format!("Cannot start npm: {}", e))?;
 
     let stdout = child.stdout.take().unwrap();
@@ -88,11 +112,16 @@ pub async fn run_npm_json(
     cwd: &str,
     args: &[&str],
 ) -> Result<serde_json::Value, String> {
-    let output = Command::new("cmd")
-        .args(["/C", npm_cmd])
+    let mut cmd = Command::new("cmd");
+    cmd.args(["/C", npm_cmd])
         .args(args)
         .current_dir(cwd)
-        .env("NO_COLOR", "1")
+        .env("NO_COLOR", "1");
+
+    #[cfg(windows)]
+    hide_console(&mut cmd);
+
+    let output = cmd
         .output()
         .await
         .map_err(|e| format!("Cannot execute npm: {}", e))?;

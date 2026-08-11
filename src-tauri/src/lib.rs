@@ -25,6 +25,8 @@ pub fn run() {
             commands::project::npm_init,
             commands::project::get_persisted_config,
             commands::config::set_mode,
+            commands::allow_scripts::get_allow_scripts,
+            commands::allow_scripts::add_allow_scripts,
             commands::query::npm_outdated,
             commands::query::npm_ls_depth0,
             commands::query::npm_ls_global,

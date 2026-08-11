@@ -44,9 +44,10 @@ pub async fn detect_environment(state: State<'_, AppState>) -> Result<NpmEnv, St
 }
 
 fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, String> {
-    let output = std::process::Command::new(cmd)
-        .args(args)
-        .output()
+    let mut process = std::process::Command::new(cmd);
+    process.args(args);
+    crate::npm::hide_console_std(&mut process);
+    let output = process.output()
         .map_err(|e| format!("Failed to execute {}: {}", cmd, e))?;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

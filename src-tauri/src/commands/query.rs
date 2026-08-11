@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tauri::State;
 use crate::state::AppState;
 use crate::types::OutdatedInfo;
+use crate::npm::hide_console;
 fn parse_outdated(stdout: &str) -> HashMap<String, OutdatedInfo> {
     let mut result = HashMap::new();
     if stdout.trim().is_empty() {
@@ -44,11 +45,11 @@ pub async fn npm_outdated(
         .ok_or_else(|| "No project open".to_string())?;
     let npm = state.npm_cmd.lock().unwrap().clone();
 
-    let output = tokio::process::Command::new("cmd")
-        .args(["/C", &npm, "outdated", "--json"])
-        .current_dir(&project_path)
-        .output()
-        .await
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", &npm, "outdated", "--json"]);
+    cmd.current_dir(&project_path);
+    hide_console(&mut cmd);
+    let output = cmd.output().await
         .map_err(|e| format!("Failed to execute npm outdated: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -72,11 +73,11 @@ pub async fn npm_ls_depth0(
         .ok_or_else(|| "No project open".to_string())?;
     let npm = state.npm_cmd.lock().unwrap().clone();
 
-    let output = tokio::process::Command::new("cmd")
-        .args(["/C", &npm, "ls", "--json", "--depth=0"])
-        .current_dir(&project_path)
-        .output()
-        .await
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", &npm, "ls", "--json", "--depth=0"]);
+    cmd.current_dir(&project_path);
+    hide_console(&mut cmd);
+    let output = cmd.output().await
         .map_err(|e| format!("Failed to execute npm ls: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -89,10 +90,10 @@ pub async fn npm_ls_global(
 ) -> Result<HashMap<String, String>, String> {
     let npm = state.npm_cmd.lock().unwrap().clone();
 
-    let output = tokio::process::Command::new("cmd")
-        .args(["/C", &npm, "ls", "-g", "--json", "--depth=0"])
-        .output()
-        .await
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", &npm, "ls", "-g", "--json", "--depth=0"]);
+    hide_console(&mut cmd);
+    let output = cmd.output().await
         .map_err(|e| format!("Failed to execute npm ls -g: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -105,10 +106,10 @@ pub async fn npm_outdated_global(
 ) -> Result<HashMap<String, OutdatedInfo>, String> {
     let npm = state.npm_cmd.lock().unwrap().clone();
 
-    let output = tokio::process::Command::new("cmd")
-        .args(["/C", &npm, "outdated", "-g", "--json"])
-        .output()
-        .await
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", &npm, "outdated", "-g", "--json"]);
+    hide_console(&mut cmd);
+    let output = cmd.output().await
         .map_err(|e| format!("Failed to execute npm outdated -g: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);

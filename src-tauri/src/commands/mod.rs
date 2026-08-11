@@ -4,3 +4,4 @@ pub mod query;
 pub mod install;
 pub mod uninstall;
 pub mod config;
+pub mod allow_scripts;

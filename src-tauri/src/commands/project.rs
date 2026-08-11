@@ -49,11 +49,11 @@ pub async fn npm_init(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let npm = state.npm_cmd.lock().unwrap().clone();
-    let output = tokio::process::Command::new("cmd")
-        .args(["/C", &npm, "init", "-y"])
-        .current_dir(&path)
-        .output()
-        .await
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", &npm, "init", "-y"]);
+    cmd.current_dir(&path);
+    crate::npm::hide_console(&mut cmd);
+    let output = cmd.output().await
         .map_err(|e| format!("npm init failed: {}", e))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
