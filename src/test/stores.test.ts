@@ -147,6 +147,59 @@ describe("usePackageStore", () => {
     expect(outdated.express.wanted).toBe("4.21.0")
     expect(outdated.lodash.current).toBe("4.17.21")
   })
+
+  it("upgradeOne installs when package has no scripts", async () => {
+    usePackageStore.setState({
+      outdated: { express: { current: "4.18.2", wanted: "4.21.0", latest: "5.0.0", dep_type: "dependencies" } },
+    })
+    mockInvoke.mockResolvedValueOnce({ has_scripts: false, allowed: false }) // check_install_scripts
+    mockInvoke.mockResolvedValueOnce(undefined) // npm_install_pkg
+    mockInvoke.mockResolvedValueOnce({ express: "4.21.0" }) // lightRefresh
+
+    await usePackageStore.getState().upgradeOne("express", "wanted")
+
+    expect(mockInvoke).toHaveBeenCalledWith("check_install_scripts", { pkg: "express", version: "4.21.0" })
+    expect(mockInvoke).toHaveBeenCalledWith(
+      "npm_install_pkg",
+      expect.objectContaining({ pkgName: "express", version: "4.21.0", saveTarget: "dependencies" })
+    )
+    expect(usePackageStore.getState().outdated.express.current).toBe("4.21.0")
+    expect(usePackageStore.getState().busyRows.has("express")).toBe(false)
+  })
+
+  it("upgradeOne cancels when user cancels script confirm", async () => {
+    usePackageStore.setState({
+      outdated: { express: { current: "4.18.2", wanted: "4.21.0", latest: "5.0.0", dep_type: "dependencies" } },
+    })
+    mockInvoke.mockResolvedValueOnce({ has_scripts: true, allowed: false })
+
+    const promise = usePackageStore.getState().upgradeOne("express", "wanted")
+    await new Promise((r) => setTimeout(r, 0))
+    expect(useUIStore.getState().activeOverlay).toBe("script-confirm")
+    useUIStore.getState().resolveScriptConfirm("cancel")
+    await promise
+
+    expect(usePackageStore.getState().busyRows.has("express")).toBe(false)
+    expect(mockInvoke).not.toHaveBeenCalledWith("npm_install_pkg", expect.anything())
+  })
+
+  it("upgradeOne omits saveTarget in global mode", async () => {
+    useProjectStore.setState({ mode: "global" })
+    usePackageStore.setState({
+      outdated: { foo: { current: "1.0.0", wanted: "1.2.0", latest: "2.0.0", dep_type: "global" } },
+    })
+    mockInvoke.mockResolvedValueOnce({ has_scripts: false, allowed: false }) // check_install_scripts
+    mockInvoke.mockResolvedValueOnce(undefined) // npm_install_pkg
+    mockInvoke.mockResolvedValueOnce({ foo: "1.2.0" }) // lightRefresh (npm_ls_global)
+
+    await usePackageStore.getState().upgradeOne("foo", "wanted")
+
+    const call = mockInvoke.mock.calls.find((c) => c[0] === "npm_install_pkg")
+    expect(call).toBeDefined()
+    expect(call![1].pkgName).toBe("foo")
+    expect(call![1].saveTarget).toBeUndefined()
+    useProjectStore.setState({ mode: "local" })
+  })
 })
 
 describe("useSelectionStore", () => {

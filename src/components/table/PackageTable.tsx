@@ -3,6 +3,7 @@ import { usePackageStore } from "../../stores/usePackageStore"
 import { useProjectStore } from "../../stores/useProjectStore"
 import { useSelectionStore } from "../../stores/useSelectionStore"
 import { PackageRow } from "./PackageRow"
+import { isMajorUpgrade } from "../../utils/semver"
 import type { PackageEntry } from "../../types"
 
 export function PackageTable() {
@@ -12,6 +13,7 @@ export function PackageTable() {
   const status = usePackageStore((s) => s.status)
   const error = usePackageStore((s) => s.error)
   const query = usePackageStore((s) => s.query)
+  const sortBy = usePackageStore((s) => s.sortBy)
   const busyRows = usePackageStore((s) => s.busyRows)
   const fetchOutdated = usePackageStore((s) => s.fetchOutdated)
   const fetchGlobalList = usePackageStore((s) => s.fetchGlobalList)
@@ -56,10 +58,8 @@ export function PackageTable() {
       }
       if (filters.majorOnly) {
         list = list.filter((pkg) => {
-          const c = parseInt(pkg.current.split(".")[0], 10)
           const target = pkg.latest || pkg.wanted || pkg.current
-          const l = parseInt(target.split(".")[0], 10)
-          return !isNaN(c) && !isNaN(l) && l > c + 1
+          return isMajorUpgrade(pkg.current, target)
         })
       }
     }
@@ -69,8 +69,34 @@ export function PackageTable() {
       list = list.filter((pkg) => pkg.name.toLowerCase().includes(query.toLowerCase()))
     }
 
-    return list
-  }, [mode, outdated, installed, query, filters])
+    // 排序
+    const sorted = [...list]
+    switch (sortBy) {
+      case "upgrade-gap": {
+        sorted.sort((a, b) => {
+          const gap = (p: PackageEntry) => {
+            const target = p.latest || p.wanted || p.current
+            const c = parseInt(p.current.split(".")[0], 10) || 0
+            const l = parseInt(target.split(".")[0], 10) || 0
+            return l - c
+          }
+          return gap(b) - gap(a)
+        })
+        break
+      }
+      case "type": {
+        sorted.sort((a, b) => a.dep_type.localeCompare(b.dep_type))
+        break
+      }
+      case "name":
+      default: {
+        sorted.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      }
+    }
+
+    return sorted
+  }, [mode, outdated, installed, query, filters, sortBy])
 
   // No project selected (local mode)
   if (mode === "local" && !projectInfo) {

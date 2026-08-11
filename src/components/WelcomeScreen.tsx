@@ -46,11 +46,15 @@ export function WelcomeScreen() {
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const env = useProjectStore((s) => s.env)
+  const envError = useProjectStore((s) => s.envError)
+  const screen = useProjectStore((s) => s.screen)
   const openFolderDialog = useProjectStore((s) => s.openFolderDialog)
   const detectEnv = useProjectStore((s) => s.detectEnv)
   const enterGlobalMode = useProjectStore((s) => s.enterGlobalMode)
+  const initPackageJson = useProjectStore((s) => s.initPackageJson)
 
-  const nodeOk = env?.node_version ? (env.node_version.startsWith("v") || env.node_version.length > 0) : false
+  const nodeOk = !!env?.node_version
+  const isNoPackageJson = screen === "no-package-json"
 
   const handleOpenProject = async () => {
     setOpening(true)
@@ -75,25 +79,52 @@ export function WelcomeScreen() {
         <p className="text-sm text-text-tertiary">你的 npm 依赖管理驾驶舱</p>
       </div>
 
+      {/* 无 package.json 引导 */}
+      {isNoPackageJson && (
+        <div className="px-4 py-2 rounded-lg bg-warn-surface border border-warn-border/40 text-xs text-warn text-center">
+          当前目录没有 package.json
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-3">
-        <button
-          onClick={handleOpenProject}
-          disabled={!nodeOk || opening}
-          className="px-5 py-2.5 bg-accent-dim hover:bg-accent rounded-lg text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg hover:shadow-accent-surface/30 active:scale-[0.98]"
-        >
-          {opening ? "正在打开..." : "📂 打开项目文件夹"}
-        </button>
-        <button
-          onClick={enterGlobalMode}
-          disabled={!nodeOk}
-          className="px-5 py-2.5 bg-paper-3 hover:bg-paper-4 rounded-lg text-text-secondary hover:text-text-primary text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 border border-border-0 hover:border-border-1 active:scale-[0.98]"
-        >
-          🌐 管理全局包
-        </button>
+        {isNoPackageJson ? (
+          <>
+            <button
+              onClick={initPackageJson}
+              className="px-5 py-2.5 bg-accent-dim hover:bg-accent rounded-lg text-white text-sm font-medium transition-all duration-150 active:scale-[0.98]"
+            >
+              📦 初始化 package.json
+            </button>
+            <button
+              onClick={handleOpenProject}
+              disabled={opening}
+              className="px-5 py-2.5 bg-paper-3 hover:bg-paper-4 rounded-lg text-text-secondary hover:text-text-primary text-sm font-medium transition-all duration-150 border border-border-0 hover:border-border-1 active:scale-[0.98]"
+            >
+              {opening ? "正在打开..." : "重新选择目录"}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleOpenProject}
+              disabled={!nodeOk || opening}
+              className="px-5 py-2.5 bg-accent-dim hover:bg-accent rounded-lg text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg hover:shadow-accent-surface/30 active:scale-[0.98]"
+            >
+              {opening ? "正在打开..." : "📂 打开项目文件夹"}
+            </button>
+            <button
+              onClick={enterGlobalMode}
+              disabled={!nodeOk}
+              className="px-5 py-2.5 bg-paper-3 hover:bg-paper-4 rounded-lg text-text-secondary hover:text-text-primary text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 border border-border-0 hover:border-border-1 active:scale-[0.98]"
+            >
+              🌐 管理全局包
+            </button>
+          </>
+        )}
       </div>
 
-      <p className="text-xs text-text-quaternary">拖拽 package.json 到窗口也可打开</p>
+      {!isNoPackageJson && <p className="text-xs text-text-quaternary">拖拽 package.json 到窗口也可打开</p>}
 
       {error && (
         <div className="px-4 py-2 rounded-lg bg-danger-surface border border-danger-border text-xs text-danger">
@@ -101,7 +132,20 @@ export function WelcomeScreen() {
         </div>
       )}
 
-      {env && <EnvStatusCard env={env} onRecheck={detectEnv} />}
+      {envError && (
+        <div className="px-4 py-2 rounded-lg bg-danger-surface border border-danger-border text-xs text-danger text-center max-w-md">
+          <p className="font-medium mb-1">环境检测失败</p>
+          <p className="break-all">{envError}</p>
+          <button
+            onClick={detectEnv}
+            className="mt-2 px-3 py-1 rounded-md bg-danger text-white hover:bg-danger-dim transition-colors"
+          >
+            重新检测
+          </button>
+        </div>
+      )}
+
+      {env && !envError && <EnvStatusCard env={env} onRecheck={detectEnv} />}
     </div>
   )
 }

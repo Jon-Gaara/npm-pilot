@@ -41,7 +41,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (err) {
       if (String(err) === "NO_PACKAGE_JSON") {
         set({ screen: "no-package-json" })
+        return
       }
+      // 其它错误（权限、路径非法等）向上抛出，由调用方展示
+      throw err
     }
   },
 
@@ -59,7 +62,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { open } = await import("@tauri-apps/plugin-dialog")
     const selected = await open({ directory: true, multiple: false, title: "选择 npm 项目目录" })
     if (selected) {
-      get().openProject(selected)
+      await get().openProject(selected)
     }
   },
 

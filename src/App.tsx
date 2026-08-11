@@ -8,7 +8,6 @@ import { Workspace } from "./components/Workspace"
 function App() {
   const screen = useProjectStore((s) => s.screen)
   const detectEnv = useProjectStore((s) => s.detectEnv)
-  const env = useProjectStore((s) => s.env)
 
   useNpmLog()
   useKeyboard()
@@ -19,9 +18,9 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-paper-0 text-text-primary flex flex-col overflow-hidden">
-      {env && screen === "welcome" && <WelcomeScreen />}
-      {env && screen === "workbench" && <Workspace />}
-      {env && screen === "no-package-json" && <WelcomeScreen />}
+      {screen === "welcome" && <WelcomeScreen />}
+      {screen === "workbench" && <Workspace />}
+      {screen === "no-package-json" && <WelcomeScreen />}
     </div>
   )
 }

@@ -29,5 +29,7 @@ src-tauri/target/
 *.sln
 *.sw?
 
-# Workbuddy internal notes.workbuddy/
 
+
+# Workbuddy internal notes
+.workbuddy/

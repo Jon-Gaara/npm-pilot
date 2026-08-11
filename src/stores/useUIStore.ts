@@ -10,6 +10,7 @@ interface ConfirmPayload {
 }
 
 export type ScriptChoice = "allow" | "skip" | "cancel"
+export type ScriptDecision = "proceed" | ScriptChoice
 
 interface ScriptConfirm {
   pkg: string
@@ -32,7 +33,7 @@ interface UIState {
   resolveConfirm: () => void
   requestScriptConfirm: (pkg: string, version: string) => Promise<ScriptChoice>
   resolveScriptConfirm: (choice: ScriptChoice) => void
-  ensureScriptsConfirmed: (pkg: string, version: string) => Promise<ScriptChoice>
+  ensureScriptsConfirmed: (pkg: string, version: string) => Promise<ScriptDecision>
   setInstallPackageName: (name: string) => void
   setInstallVersion: (version: string) => void
   setInstallSaveTarget: (target: "dependencies" | "devDependencies" | "no-save") => void
@@ -94,12 +95,12 @@ export const useUIStore = create<UIState>((set, get) => ({
         { pkg, version: version || null }
       )
       if (!check.has_scripts || check.allowed) {
-        return "proceed" as ScriptChoice
+        return "proceed"
       }
       return await get().requestScriptConfirm(pkg, version)
     } catch (err) {
       useTerminalStore.getState().pushError(`脚本检查失败: ${String(err)}`)
-      return "proceed" as ScriptChoice
+      return "proceed"
     }
   },
 

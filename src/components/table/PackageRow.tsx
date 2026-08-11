@@ -1,4 +1,5 @@
 import { Spinner } from "../common/Spinner"
+import { isMajorUpgrade } from "../../utils/semver"
 
 interface PackageRowProps {
   name: string
@@ -14,7 +15,7 @@ interface PackageRowProps {
 }
 
 export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, selected, onToggle, onUpgrade, onUninstall }: PackageRowProps) {
-  const hasMajor = wanted && latest && isMajor(current, latest)
+  const hasMajor = wanted && latest && isMajorUpgrade(current, latest)
 
   return (
     <tr className={`border-b border-border-0/50 hover:bg-paper-2/50 transition-all duration-100 group ${busy ? "opacity-60 pointer-events-none" : ""} ${selected ? "bg-accent-surface/20" : ""}`}>
@@ -98,10 +99,4 @@ export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, sel
       </td>
     </tr>
   )
-}
-
-function isMajor(current: string, latest: string): boolean {
-  const c = parseInt(current.split(".")[0], 10)
-  const l = parseInt(latest.split(".")[0], 10)
-  return !isNaN(c) && !isNaN(l) && l > c + 1
 }

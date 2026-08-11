@@ -1,6 +1,8 @@
 import { create } from "zustand"
 import { invoke } from "@tauri-apps/api/core"
 import type { OutdatedInfo, AppMode } from "../types"
+// 注意：usePackageStore <-> useUIStore 存在循环引用，属有意为之。
+// 所有跨 store 调用都通过 getState() 惰性取值，绝不在此模块顶层访问，避免初始化未定义。
 import { useTerminalStore } from "./useTerminalStore"
 import { useProjectStore } from "./useProjectStore"
 import { useUIStore } from "./useUIStore"
@@ -8,6 +10,9 @@ import { useUIStore } from "./useUIStore"
 type FetchStatus = "idle" | "loading" | "success" | "error"
 type SortBy = "name" | "upgrade-gap" | "type"
 
+// 筛选命名约定：
+// - outdatedOnly / majorOnly：本地模式（PackageTable 用 hasUpdate / isMajorUpgrade 过滤）
+// - showOutdatedOnly：全局模式（含义同为"只显示有更新的"）
 interface Filters {
   outdatedOnly: boolean
   majorOnly: boolean
@@ -139,6 +144,7 @@ export const usePackageStore = create<PackageState>((set, get) => ({
     set((s) => ({ refreshGeneration: s.refreshGeneration + 1 }))
 
     const terminalStore = useTerminalStore.getState()
+    const mode = useProjectStore.getState().mode
 
     // 安装前确认脚本：'proceed' 直接装，'allow' 先放行，'skip' 跳过脚本装，'cancel' 中止
     const decision = await useUIStore.getState().ensureScriptsConfirmed(name, version)
@@ -162,7 +168,8 @@ export const usePackageStore = create<PackageState>((set, get) => ({
       await invoke("npm_install_pkg", {
         pkgName: name,
         version: version,
-        saveTarget: info.dep_type === "devDependencies" ? "devDependencies" : "dependencies",
+        // 全局模式不传 saveTarget（Rust 端按 -g 安装，忽略 saveTarget）
+        saveTarget: mode === "global" ? undefined : (info.dep_type === "devDependencies" ? "devDependencies" : "dependencies"),
         exact: false,
       })
       // 事件监听器会自动调用 endOperation，这里不重复调用

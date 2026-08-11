@@ -24,6 +24,11 @@ export function InstallDrawer() {
       setError("包名包含非法字符")
       return
     }
+    const v = version.trim()
+    if (v && !/^[0-9a-zA-Z.*+\-^~><=\s]+$/.test(v)) {
+      setError("版本号包含非法字符")
+      return
+    }
 
     setInstalling(true)
     setError(null)
@@ -58,7 +63,7 @@ export function InstallDrawer() {
         saveTarget: saveTarget,
         exact: exact,
       })
-      terminalStore.endOperation(true)
+      // 事件监听器会自动调用 endOperation，这里不重复调用
       usePackageStore.getState().lightRefresh()
       usePackageStore.getState().fetchOutdated()
       useToastStore.getState().push(
@@ -68,7 +73,6 @@ export function InstallDrawer() {
       setTimeout(() => closeOverlay(), 1500)
     } catch (err) {
       setError(String(err))
-      terminalStore.endOperation(false)
       useToastStore.getState().push(`安装失败: ${String(err)}`, "error")
     } finally {
       setInstalling(false)
