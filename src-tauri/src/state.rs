@@ -6,6 +6,7 @@ pub struct AppState {
     pub mode: Mutex<String>,
     pub npm_cmd: Mutex<String>,
     pub config: Mutex<PersistedConfig>,
+    pub script_check_cache: Mutex<std::collections::HashMap<String, bool>>,
 }
 
 impl AppState {
@@ -15,6 +16,7 @@ impl AppState {
             mode: Mutex::new("local".to_string()),
             npm_cmd: Mutex::new("npm".to_string()),
             config: Mutex::new(config),
+            script_check_cache: Mutex::new(std::collections::HashMap::new()),
         }
     }
 

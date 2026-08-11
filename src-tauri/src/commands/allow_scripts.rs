@@ -1,5 +1,8 @@
 use tauri::State;
+use tauri::Manager;
 use crate::state::AppState;
+use crate::types::ScriptCheck;
+use crate::npm::{hide_console, hide_console_std};
 
 /// 从 npm warn install-scripts 行中提取被拦截的包名。
 /// 行格式: "npm warn install-scripts   <name>@<version> (postinstall: <cmd>)"
@@ -22,11 +25,80 @@ pub fn extract_blocked_package(line: &str) -> Option<String> {
 pub fn get_allow_scripts() -> Result<String, String> {
     let mut cmd = std::process::Command::new("npm");
     cmd.args(["config", "get", "allow-scripts", "--location=user"]);
-    crate::npm::hide_console_std(&mut cmd);
+    hide_console_std(&mut cmd);
     let output = cmd.output()
         .map_err(|e| format!("Failed to read npm config: {}", e))?;
     let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
     Ok(value)
+}
+
+fn is_allowed(pkg: &str) -> bool {
+    let value = match get_allow_scripts() {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    value
+        .split(',')
+        .map(|s| s.trim())
+        .any(|s| s == pkg)
+}
+
+async fn query_has_scripts(spec: &str) -> Result<bool, String> {
+    let mut cmd = tokio::process::Command::new("cmd");
+    cmd.args(["/C", "npm", "view", spec, "scripts", "--json"]);
+    hide_console(&mut cmd);
+    let output = cmd.output().await
+        .map_err(|e| format!("Failed to query scripts: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_scripts_has_scripts(&stdout))
+}
+
+fn parse_scripts_has_scripts(stdout: &str) -> bool {
+    let parsed: serde_json::Value = match serde_json::from_str(stdout) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    parsed
+        .as_object()
+        .map(|obj| {
+            ["postinstall", "preinstall", "install"]
+                .iter()
+                .any(|k| obj.get(*k).and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false))
+        })
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn check_install_scripts(
+    app: tauri::AppHandle,
+    pkg: String,
+    version: Option<String>,
+) -> Result<ScriptCheck, String> {
+    let state = app.state::<AppState>();
+    let spec = match &version {
+        Some(v) if !v.is_empty() => format!("{}@{}", pkg, v),
+        _ => pkg.clone(),
+    };
+
+    if is_allowed(&pkg) {
+        return Ok(ScriptCheck { has_scripts: true, allowed: true });
+    }
+
+    let has_scripts = {
+        let cached = state.script_check_cache.lock().unwrap().get(&spec).copied();
+        match cached {
+            Some(v) => v,
+            None => {
+                let v = query_has_scripts(&spec).await.unwrap_or(false);
+                state.script_check_cache.lock().unwrap().insert(spec, v);
+                v
+            }
+        }
+    };
+
+    Ok(ScriptCheck { has_scripts, allowed: false })
 }
 
 #[tauri::command]
@@ -109,5 +181,48 @@ mod tests {
     fn test_ignores_unrelated_line() {
         let line = "added 57 packages in 3s";
         assert_eq!(extract_blocked_package(line), None);
+    }
+
+    // ─── parse_scripts_has_scripts ───
+
+    #[test]
+    fn test_scripts_with_postinstall() {
+        let json = r#"{"postinstall":"node scripts/install.js"}"#;
+        assert!(parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_with_preinstall() {
+        let json = r#"{"preinstall":"node build.js"}"#;
+        assert!(parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_with_install() {
+        let json = r#"{"install":"node install.js"}"#;
+        assert!(parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_empty() {
+        let json = r#"{}"#;
+        assert!(!parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_only_other_hooks() {
+        let json = r#"{"test":"node test.js","build":"vite build"}"#;
+        assert!(!parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_empty_value() {
+        let json = r#"{"postinstall":""}"#;
+        assert!(!parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_invalid_json() {
+        assert!(!parse_scripts_has_scripts("not json"));
     }
 }

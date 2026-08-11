@@ -28,3 +28,6 @@ src-tauri/target/
 *.njsproj
 *.sln
 *.sw?
+
+# Workbuddy internal notes.workbuddy/
+

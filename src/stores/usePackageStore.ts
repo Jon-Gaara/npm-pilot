@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import type { OutdatedInfo, AppMode } from "../types"
 import { useTerminalStore } from "./useTerminalStore"
 import { useProjectStore } from "./useProjectStore"
+import { useUIStore } from "./useUIStore"
 
 type FetchStatus = "idle" | "loading" | "success" | "error"
 type SortBy = "name" | "upgrade-gap" | "type"
@@ -138,6 +139,23 @@ export const usePackageStore = create<PackageState>((set, get) => ({
     set((s) => ({ refreshGeneration: s.refreshGeneration + 1 }))
 
     const terminalStore = useTerminalStore.getState()
+
+    // 安装前确认脚本：'proceed' 直接装，'allow' 先放行，'skip' 跳过脚本装，'cancel' 中止
+    const decision = await useUIStore.getState().ensureScriptsConfirmed(name, version)
+    if (decision === "cancel") {
+      setRowBusy(name, false)
+      return
+    }
+    if (decision === "allow") {
+      try {
+        await invoke("add_allow_scripts", { pkg: name })
+      } catch (err) {
+        terminalStore.pushError(`放行失败: ${String(err)}`)
+        setRowBusy(name, false)
+        return
+      }
+    }
+
     terminalStore.startOperation(`npm install ${name}@${version}`)
 
     try {

@@ -25,6 +25,7 @@ export function TopBar() {
       {/* Search */}
       <div className="flex-1 max-w-xs relative group">
         <input
+          id="npm-pilot-search"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

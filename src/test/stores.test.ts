@@ -9,6 +9,7 @@ import { useProjectStore } from "../stores/useProjectStore"
 import { usePackageStore } from "../stores/usePackageStore"
 import { useSelectionStore } from "../stores/useSelectionStore"
 import { useUIStore } from "../stores/useUIStore"
+import { useToastStore } from "../stores/useToastStore"
 import type { NpmEnv, OutdatedInfo } from "../types"
 
 const mockInvoke = invoke as ReturnType<typeof vi.fn>
@@ -33,9 +34,11 @@ beforeEach(() => {
     refreshGeneration: 0,
   })
   useSelectionStore.setState({ selected: new Set() })
+  useToastStore.setState({ toasts: [] })
   useUIStore.setState({
     activeOverlay: null,
     confirmPayload: null,
+    scriptConfirm: null,
     installPackageName: "",
     installVersion: "",
     installSaveTarget: "dependencies",
@@ -198,5 +201,60 @@ describe("useUIStore", () => {
     expect(useUIStore.getState().activeOverlay).toBe("confirm-dialog")
     expect(useUIStore.getState().confirmPayload?.pkgName).toBe("express")
     expect(useUIStore.getState().confirmPayload?.type).toBe("uninstall")
+  })
+
+  it("ensureScriptsConfirmed proceeds when no scripts", async () => {
+    mockInvoke.mockResolvedValueOnce({ has_scripts: false, allowed: false })
+    const decision = await useUIStore.getState().ensureScriptsConfirmed("react", "1.0.0")
+    expect(decision).toBe("proceed")
+    expect(mockInvoke).toHaveBeenCalledWith("check_install_scripts", { pkg: "react", version: "1.0.0" })
+  })
+
+  it("ensureScriptsConfirmed proceeds when already allowed", async () => {
+    mockInvoke.mockResolvedValueOnce({ has_scripts: true, allowed: true })
+    const decision = await useUIStore.getState().ensureScriptsConfirmed("opencode-ai", "")
+    expect(decision).toBe("proceed")
+  })
+
+  it("ensureScriptsConfirmed opens dialog when blocked and returns choice", async () => {
+    mockInvoke.mockResolvedValueOnce({ has_scripts: true, allowed: false })
+
+    const promise = useUIStore.getState().ensureScriptsConfirmed("@scope/pkg", "1.0.0")
+    // 等待 dialog 状态设置
+    await new Promise((r) => setTimeout(r, 0))
+    expect(useUIStore.getState().activeOverlay).toBe("script-confirm")
+    expect(useUIStore.getState().scriptConfirm?.pkg).toBe("@scope/pkg")
+
+    useUIStore.getState().resolveScriptConfirm("allow")
+    const decision = await promise
+    expect(decision).toBe("allow")
+    expect(useUIStore.getState().activeOverlay).toBeNull()
+  })
+
+  it("ensureScriptsConfirmed proceeds on check error", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("network"))
+    const decision = await useUIStore.getState().ensureScriptsConfirmed("react", "")
+    expect(decision).toBe("proceed")
+  })
+})
+
+describe("useToastStore", () => {
+  it("starts empty", () => {
+    expect(useToastStore.getState().toasts).toEqual([])
+  })
+
+  it("push adds a toast", () => {
+    useToastStore.getState().push("已安装 react", "success")
+    const toasts = useToastStore.getState().toasts
+    expect(toasts.length).toBe(1)
+    expect(toasts[0].message).toBe("已安装 react")
+    expect(toasts[0].type).toBe("success")
+  })
+
+  it("remove deletes a toast", () => {
+    useToastStore.getState().push("message", "info")
+    const id = useToastStore.getState().toasts[0].id
+    useToastStore.getState().remove(id)
+    expect(useToastStore.getState().toasts).toEqual([])
   })
 })

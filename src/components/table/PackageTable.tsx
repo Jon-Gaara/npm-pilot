@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { usePackageStore } from "../../stores/usePackageStore"
 import { useProjectStore } from "../../stores/useProjectStore"
+import { useSelectionStore } from "../../stores/useSelectionStore"
 import { PackageRow } from "./PackageRow"
 import type { PackageEntry } from "../../types"
 
@@ -20,40 +21,38 @@ export function PackageTable() {
   const projectInfo = useProjectStore((s) => s.projectInfo)
   const filters = usePackageStore((s) => s.filters)
 
+  const selected = useSelectionStore((s) => s.selected)
+  const toggle = useSelectionStore((s) => s.toggle)
+  const clearAll = useSelectionStore((s) => s.clearAll)
+  const selectAll = useSelectionStore((s) => s.selectAll)
+
   const entries = useMemo(() => {
-    let list: PackageEntry[]
+    // 优先从 installed 出发（展示全部已安装依赖），合并 outdated 信息；
+    // 若 installed 为空（如 npm_ls 失败），回退用 outdated 的 key 兜底
+    const base: Record<string, string> =
+      Object.keys(installed).length > 0
+        ? installed
+        : Object.fromEntries(Object.keys(outdated).map((k) => [k, outdated[k]?.current ?? ""]))
+
+    let list: PackageEntry[] = Object.entries(base).map(([name, current]) => {
+      const updateInfo = outdated[name]
+      return {
+        name,
+        current,
+        wanted: updateInfo?.wanted,
+        latest: updateInfo?.latest,
+        dep_type: mode === "global" ? "global" : (updateInfo?.dep_type ?? "dependencies"),
+        hasUpdate: mode === "global" ? !!updateInfo : (updateInfo ? updateInfo.current !== updateInfo.wanted : false),
+      }
+    })
 
     if (mode === "global") {
-      // 全局模式：从 installed 出发，合并 outdated 信息
-      list = Object.entries(installed).map(([name, current]) => {
-        const updateInfo = outdated[name]
-        return {
-          name,
-          current,
-          wanted: updateInfo?.wanted,
-          latest: updateInfo?.latest,
-          dep_type: "global",
-          hasUpdate: !!updateInfo,
-        }
-      })
-
-      // 筛选：勾选"有更新版本"时只显示有更新的
       if (filters.showOutdatedOnly) {
         list = list.filter((pkg) => pkg.hasUpdate)
       }
     } else {
-      // 本地模式：从 outdated 出发
-      list = Object.entries(outdated).map(([name, info]) => ({
-        name,
-        current: info.current,
-        wanted: info.wanted,
-        latest: info.latest,
-        dep_type: info.dep_type,
-        hasUpdate: info.current !== info.wanted,
-      }))
-
       if (filters.outdatedOnly) {
-        list = list.filter((pkg) => pkg.current !== pkg.wanted)
+        list = list.filter((pkg) => pkg.hasUpdate)
       }
       if (filters.majorOnly) {
         list = list.filter((pkg) => {
@@ -83,8 +82,8 @@ export function PackageTable() {
     )
   }
 
-  // Loading skeleton
-  if (status === "loading" && entries.length === 0) {
+  // Loading skeleton (首次 idle 也先显示骨架，避免闪空态)
+  if ((status === "loading" || status === "idle") && entries.length === 0) {
     return (
       <div className="p-4 space-y-2">
         {Array.from({ length: 6 }).map((_, i) => (
@@ -112,48 +111,125 @@ export function PackageTable() {
 
   // Empty state
   if (entries.length === 0) {
+    let title: string
+    let hint: string
+
+    if (query) {
+      title = "没有匹配的包"
+      hint = `未找到包含 "${query}" 的包`
+    } else if (mode === "global" && filters.showOutdatedOnly) {
+      title = "🎉 所有全局包都是最新的"
+      hint = "没有需要更新的全局包"
+    } else if (mode === "global") {
+      title = "📦 没有安装全局包"
+      hint = "运行 npm install -g <pkg> 安装全局包"
+    } else if (filters.outdatedOnly || filters.majorOnly) {
+      title = "没有符合条件的包"
+      hint = "所有已安装的依赖都满足当前筛选条件"
+    } else {
+      title = "📦 没有已安装的依赖"
+      hint = "这个项目还没有安装任何依赖"
+    }
+
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2 text-text-tertiary">
-        <p className="text-sm text-text-secondary">{mode === "global" ? "📦 没有安装全局包" : "🎉 所有包都是最新的"}</p>
-        <p className="text-xs text-text-quaternary">
-          {mode === "global" && filters.showOutdatedOnly
-            ? "所有全局包都是最新的"
-            : mode === "global"
-              ? "运行 npm install -g <pkg> 安装全局包"
-              : "没有过时的依赖需要更新"}
-        </p>
+        <p className="text-sm text-text-secondary">{title}</p>
+        <p className="text-xs text-text-quaternary">{hint}</p>
       </div>
     )
   }
 
+  const handleBulkUpgrade = () => {
+    const targets = Array.from(selected)
+    clearAll()
+    targets.forEach((name) => upgradeOne(name, "wanted"))
+  }
+
+  const handleBulkUninstall = () => {
+    const targets = Array.from(selected)
+    clearAll()
+    targets.forEach((name) => uninstallOne(name))
+  }
+
+  const visibleNames = entries.map((e) => e.name)
+  const allVisibleSelected = visibleNames.length > 0 && visibleNames.every((n) => selected.has(n))
+  const someSelected = visibleNames.some((n) => selected.has(n))
+
+  const handleToggleAll = () => {
+    if (allVisibleSelected) {
+      clearAll()
+    } else {
+      selectAll(visibleNames)
+    }
+  }
+
   return (
-    <div className="h-full overflow-y-auto">
-      <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-surface-0 z-10">
-          <tr className="text-xs text-text-tertiary border-b border-border-0">
-            <th className="text-left px-4 py-2 font-medium w-8"></th>
-            <th className="text-left px-4 py-2 font-medium">包名</th>
-            <th className="text-left px-4 py-2 font-medium w-28">已安装</th>
-            <th className="text-left px-4 py-2 font-medium w-28">可升级到</th>
-            <th className="text-left px-4 py-2 font-medium w-20">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <PackageRow
-              key={entry.name}
-              name={entry.name}
-              current={entry.current}
-              wanted={entry.wanted}
-              latest={entry.latest}
-              busy={busyRows.has(entry.name)}
-              hasUpdate={entry.hasUpdate}
-              onUpgrade={(target) => upgradeOne(entry.name, target)}
-              onUninstall={() => uninstallOne(entry.name)}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div className="h-full flex flex-col relative">
+      <div className="flex-1 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-paper-1 z-10">
+            <tr className="text-xs text-text-tertiary border-b border-border-0">
+              <th className="text-left px-4 py-2 font-medium w-8">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allVisibleSelected }}
+                  onChange={handleToggleAll}
+                  aria-label="全选"
+                  className="accent-accent-dim rounded-sm cursor-pointer"
+                />
+              </th>
+              <th className="text-left px-4 py-2 font-medium">包名</th>
+              <th className="text-left px-4 py-2 font-medium w-28">已安装</th>
+              <th className="text-left px-4 py-2 font-medium w-28">可升级到</th>
+              <th className="text-left px-4 py-2 font-medium w-20">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <PackageRow
+                key={entry.name}
+                name={entry.name}
+                current={entry.current}
+                wanted={entry.wanted}
+                latest={entry.latest}
+                busy={busyRows.has(entry.name)}
+                hasUpdate={entry.hasUpdate}
+                selected={selected.has(entry.name)}
+                onToggle={() => toggle(entry.name)}
+                onUpgrade={(target) => upgradeOne(entry.name, target)}
+                onUninstall={() => uninstallOne(entry.name)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="shrink-0 mx-3 mb-3 px-3 py-2 rounded-lg bg-paper-2 border border-border-0 flex items-center gap-3">
+          <span className="text-xs text-text-secondary">已选 {selected.size} 个</span>
+          <div className="flex-1" />
+          <button
+            onClick={handleBulkUninstall}
+            className="px-3 py-1.5 text-xs font-medium bg-danger-surface text-danger hover:bg-danger-dim hover:text-white border border-danger-border/40 rounded-lg transition-colors active:scale-[0.97]"
+          >
+            卸载所选
+          </button>
+          <button
+            onClick={handleBulkUpgrade}
+            className="px-3 py-1.5 text-xs font-medium bg-accent-dim hover:bg-accent text-white rounded-lg transition-colors active:scale-[0.97]"
+          >
+            升级所选
+          </button>
+          <button
+            onClick={clearAll}
+            className="px-2 py-1.5 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+          >
+            清除
+          </button>
+        </div>
+      )}
     </div>
   )
 }

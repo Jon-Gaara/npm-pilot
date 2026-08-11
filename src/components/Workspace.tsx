@@ -5,6 +5,8 @@ import { PackageTable } from "./table/PackageTable"
 import { TerminalDrawer } from "./drawers/TerminalDrawer"
 import { InstallDrawer } from "./drawers/InstallDrawer"
 import { ConfirmDialog } from "./dialogs/ConfirmDialog"
+import { ScriptConfirmDialog } from "./dialogs/ScriptConfirmDialog"
+import { Toast } from "./common/Toast"
 import { useUIStore } from "../stores/useUIStore"
 import { useProjectStore } from "../stores/useProjectStore"
 import { usePackageStore } from "../stores/usePackageStore"
@@ -16,12 +18,14 @@ export function Workspace() {
   const fetchOutdated = usePackageStore((s) => s.fetchOutdated)
   const fetchGlobalList = usePackageStore((s) => s.fetchGlobalList)
   const fetchGlobalOutdated = usePackageStore((s) => s.fetchGlobalOutdated)
+  const lightRefresh = usePackageStore((s) => s.lightRefresh)
 
   useEffect(() => {
     if (mode === "global") {
       fetchGlobalList()
       fetchGlobalOutdated()
     } else if (projectInfo) {
+      lightRefresh()
       fetchOutdated()
     }
   }, [mode, projectInfo])
@@ -39,6 +43,8 @@ export function Workspace() {
 
       {activeOverlay === "install-drawer" && <InstallDrawer />}
       {activeOverlay === "confirm-dialog" && <ConfirmDialog />}
+      {activeOverlay === "script-confirm" && <ScriptConfirmDialog />}
+      <Toast />
     </div>
   )
 }

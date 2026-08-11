@@ -1,3 +1,5 @@
+import { Spinner } from "../common/Spinner"
+
 interface PackageRowProps {
   name: string
   current: string
@@ -5,17 +7,25 @@ interface PackageRowProps {
   latest?: string
   busy: boolean
   hasUpdate: boolean
+  selected: boolean
+  onToggle: () => void
   onUpgrade: (target: "wanted" | "latest") => void
   onUninstall: () => void
 }
 
-export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, onUpgrade, onUninstall }: PackageRowProps) {
+export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, selected, onToggle, onUpgrade, onUninstall }: PackageRowProps) {
   const hasMajor = wanted && latest && isMajor(current, latest)
 
   return (
-    <tr className={`border-b border-border-0/50 hover:bg-paper-2/50 transition-all duration-100 group ${busy ? "opacity-50 pointer-events-none" : ""}`}>
+    <tr className={`border-b border-border-0/50 hover:bg-paper-2/50 transition-all duration-100 group ${busy ? "opacity-60 pointer-events-none" : ""} ${selected ? "bg-accent-surface/20" : ""}`}>
       <td className="px-4 py-3">
-        <input type="checkbox" className="accent-accent-dim rounded-sm opacity-30 group-hover:opacity-100 transition-opacity" />
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          aria-label={`选择 ${name}`}
+          className="accent-accent-dim rounded-sm opacity-30 group-hover:opacity-100 transition-opacity cursor-pointer"
+        />
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
@@ -25,6 +35,11 @@ export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, onU
               major
             </span>
           )}
+          {hasUpdate && !hasMajor && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-surface text-accent border border-accent-border/30">
+              有新版本
+            </span>
+          )}
         </div>
       </td>
       <td className="px-4 py-3">
@@ -32,7 +47,10 @@ export function PackageRow({ name, current, wanted, latest, busy, hasUpdate, onU
       </td>
       <td className="px-4 py-3">
         {busy ? (
-          <span className="inline-block w-20 h-4 bg-paper-3 rounded animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 text-xs text-text-tertiary">
+            <Spinner size={12} className="text-accent" />
+            处理中…
+          </span>
         ) : hasUpdate && wanted ? (
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-xs text-accent font-medium">{wanted}</span>

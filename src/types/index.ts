@@ -50,4 +50,4 @@ export type AppMode = "local" | "global"
 export type Screen = "welcome" | "no-package-json" | "workbench"
 export type SortField = "name" | "upgrade-gap" | "type"
 export type DepFilter = "all" | "dependencies" | "devDependencies"
-export type OverlayType = "install-drawer" | "confirm-dialog" | null
+export type OverlayType = "install-drawer" | "confirm-dialog" | "script-confirm" | null

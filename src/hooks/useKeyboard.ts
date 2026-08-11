@@ -5,13 +5,20 @@ import { usePackageStore } from "../stores/usePackageStore"
 export function useKeyboard() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "r") {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === "r") {
         e.preventDefault()
         usePackageStore.getState().fetchOutdated()
       }
-      if (e.ctrlKey && e.key === "i") {
+      if (mod && e.key === "i") {
         e.preventDefault()
         useUIStore.getState().openInstallDrawer()
+      }
+      if (mod && e.key === "k") {
+        e.preventDefault()
+        const el = document.getElementById("npm-pilot-search") as HTMLInputElement | null
+        el?.focus()
+        el?.select()
       }
       if (e.key === "Escape") {
         e.preventDefault()

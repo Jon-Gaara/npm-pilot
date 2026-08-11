@@ -6,6 +6,7 @@ export function Sidebar() {
   const switchMode = useProjectStore((s) => s.switchMode)
   const projectInfo = useProjectStore((s) => s.projectInfo)
   const openFolderDialog = useProjectStore((s) => s.openFolderDialog)
+  const env = useProjectStore((s) => s.env)
   const filters = usePackageStore((s) => s.filters)
   const toggleFilter = usePackageStore((s) => s.toggleFilter)
 
@@ -47,7 +48,7 @@ export function Sidebar() {
                 onChange={() => toggleFilter("outdatedOnly")}
                 className="accent-accent-dim rounded"
               />
-              有过时版本
+              有更新版本
             </label>
             <label className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer group">
               <input
@@ -106,8 +107,15 @@ export function Sidebar() {
           </div>
 
           <div className="mt-auto mx-3 mb-3 p-3 rounded-xl bg-paper-2 border border-border-0">
-            <div className="text-xs text-text-tertiary font-medium">全局包</div>
-            <div className="text-xs text-text-quaternary mt-1">操作全局安装的 npm 包</div>
+            <div className="text-xs text-text-tertiary font-medium">全局环境</div>
+            {env?.global_prefix ? (
+              <>
+                <div className="text-xs text-text-tertiary mt-1">Node v{env.node_version || "?"}</div>
+                <div className="text-xs text-text-quaternary mt-1 break-all font-mono">{env.global_prefix}</div>
+              </>
+            ) : (
+              <div className="text-xs text-text-quaternary mt-1">操作全局安装的 npm 包</div>
+            )}
           </div>
         </>
       )}

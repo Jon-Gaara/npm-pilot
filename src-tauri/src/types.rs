@@ -70,6 +70,12 @@ pub struct OutdatedInfo {
     pub dep_type: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptCheck {
+    pub has_scripts: bool,
+    pub allowed: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct LogPayload {
     pub stream: String,
