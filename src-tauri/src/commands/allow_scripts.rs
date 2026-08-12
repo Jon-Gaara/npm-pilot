@@ -9,6 +9,11 @@ use crate::npm::{hide_console, hide_console_std};
 /// 支持 scoped 包（@scope/name@version）。
 #[allow(dead_code)]
 pub fn extract_blocked_package(line: &str) -> Option<String> {
+    // 只匹配真实包行（含 "(postinstall:" / "(install:" / "(preinstall:" 脚本标记），
+    // 忽略 summary 行与建议行（它们没有脚本标记，会被误判为包名）。
+    if !line.contains("(postinstall:") && !line.contains("(preinstall:") && !line.contains("(install:") {
+        return None;
+    }
     let marker = "install-scripts";
     let idx = line.find(marker)?;
     let after = &line[idx + marker.len()..];
@@ -111,6 +116,14 @@ pub fn add_allow_scripts(state: State<'_, AppState>, pkg: String) -> Result<(), 
     if pkg.trim().is_empty() {
         return Err("Package name cannot be empty".into());
     }
+    // 防御：只接受合法 npm 包名，拒绝建议行/畸形输入（含空格、反引号、分号等）
+    let valid = pkg.chars().all(|c| {
+        c.is_ascii_lowercase() || c.is_ascii_digit()
+        || matches!(c, '-' | '.' | '_' | '~' | '@' | '/')
+    });
+    if !valid || pkg.len() > 214 {
+        return Err(format!("Invalid package name: {:?}", pkg));
+    }
     let npm = state.npm_cmd.lock().unwrap().clone();
 
     let mut get = std::process::Command::new(&npm);
@@ -180,6 +193,12 @@ mod tests {
     #[test]
     fn test_ignores_suggestion_line() {
         let line = "npm warn install-scripts Run `npm config set allow-scripts=opencode-ai --location=user` to allow them for all global installs.";
+        assert_eq!(extract_blocked_package(line), None);
+    }
+
+    #[test]
+    fn test_ignores_scoped_suggestion_line() {
+        let line = "npm warn install-scripts Run `npm install -g --allow-scripts=@alibaba-group/open-code-review` to allow these scripts once, or `npm config set allow-scripts=@alibaba-group/open-code-review --location=user` to allow them for all global installs.";
         assert_eq!(extract_blocked_package(line), None);
     }
 

@@ -27,6 +27,11 @@ describe("extractBlockedPackage", () => {
     expect(extractBlockedPackage(line)).toBeNull()
   })
 
+  it("returns null for scoped suggestion line", () => {
+    const line = "npm warn install-scripts Run `npm install -g --allow-scripts=@alibaba-group/open-code-review` to allow these scripts once, or `npm config set allow-scripts=@alibaba-group/open-code-review --location=user` to allow them."
+    expect(extractBlockedPackage(line)).toBeNull()
+  })
+
   it("returns null for unrelated line", () => {
     expect(extractBlockedPackage("added 57 packages in 3s")).toBeNull()
   })

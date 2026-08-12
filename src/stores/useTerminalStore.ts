@@ -7,6 +7,10 @@ const MAX_LINES = 2000
 let lineId = 0
 
 export function extractBlockedPackage(line: string): string | null {
+  // 只匹配真实包行（含 "(postinstall:" 等脚本标记），忽略 summary/suggestion 行
+  if (!line.includes("(postinstall:") && !line.includes("(preinstall:") && !line.includes("(install:")) {
+    return null
+  }
   const marker = "install-scripts"
   const idx = line.indexOf(marker)
   if (idx < 0) return null
