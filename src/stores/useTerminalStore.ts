@@ -1,26 +1,9 @@
 import { create } from "zustand"
 import { listen } from "@tauri-apps/api/event"
-import { invoke } from "@tauri-apps/api/core"
 import type { TerminalLine, LogPayload } from "../types"
 
 const MAX_LINES = 2000
 let lineId = 0
-
-export function extractBlockedPackage(line: string): string | null {
-  // 只匹配真实包行（含 "(postinstall:" 等脚本标记），忽略 summary/suggestion 行
-  if (!line.includes("(postinstall:") && !line.includes("(preinstall:") && !line.includes("(install:")) {
-    return null
-  }
-  const marker = "install-scripts"
-  const idx = line.indexOf(marker)
-  if (idx < 0) return null
-  const after = line.slice(idx + marker.length).trim()
-  const spec = after.split(" (")[0]
-  const vidx = spec.lastIndexOf("@")
-  if (vidx < 0) return null
-  const name = spec.slice(0, vidx)
-  return name || null
-}
 
 interface TerminalState {
   lines: TerminalLine[]
@@ -28,8 +11,6 @@ interface TerminalState {
   expanded: boolean
   autoScroll: boolean
   currentOpId: string | null
-  blockedScripts: Set<string>
-  allowingPkg: string | null
 
   startOperation: (label: string) => string
   push: (level: TerminalLine["level"], text: string) => void
@@ -40,8 +21,6 @@ interface TerminalState {
   toggleExpanded: () => void
   setAutoScroll: (v: boolean) => void
   clear: () => void
-  allowScript: (pkg: string) => Promise<void>
-  removeBlockedScript: (pkg: string) => void
   startListening: () => Promise<() => void>
 }
 
@@ -51,8 +30,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   expanded: false,
   autoScroll: true,
   currentOpId: null,
-  blockedScripts: new Set(),
-  allowingPkg: null,
 
   startOperation: (label) => {
     const opId = `op-${Date.now()}`
@@ -68,8 +45,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     return opId
   },
 
-  push: (level, text) => {
-    const blocked = extractBlockedPackage(text)
+  push: (level, text) =>
     set((s) => {
       const newLine: TerminalLine = {
         id: ++lineId,
@@ -84,15 +60,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       } else {
         lines = [...s.lines, newLine]
       }
-      const next: Partial<TerminalState> = { lines }
-      if (blocked) {
-        const blockedScripts = new Set(s.blockedScripts)
-        blockedScripts.add(blocked)
-        next.blockedScripts = blockedScripts
-      }
-      return next
-    })
-  },
+      return { lines }
+    }),
 
   pushCmd: (text) => {
     const store = get()
@@ -128,28 +97,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setAutoScroll: (autoScroll) => set({ autoScroll }),
 
-  clear: () => set({ lines: [], running: false, blockedScripts: new Set(), allowingPkg: null }),
-
-  allowScript: async (pkg) => {
-    set({ allowingPkg: pkg })
-    try {
-      await invoke("add_allow_scripts", { pkg })
-      const blockedScripts = new Set(get().blockedScripts)
-      blockedScripts.delete(pkg)
-      set({ blockedScripts, allowingPkg: null })
-      get().pushInfo(`✓ 已放行 ${pkg} 的安装脚本，请重新安装`)
-    } catch (err) {
-      get().pushError(`放行失败: ${String(err)}`)
-      set({ allowingPkg: null })
-    }
-  },
-
-  removeBlockedScript: (pkg) =>
-    set((s) => {
-      const blockedScripts = new Set(s.blockedScripts)
-      blockedScripts.delete(pkg)
-      return { blockedScripts }
-    }),
+  clear: () => set({ lines: [], running: false }),
 
   startListening: async () => {
     const unlisten = await listen<LogPayload>("npm-log", (event) => {

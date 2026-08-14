@@ -26,9 +26,6 @@ export function TerminalDrawer() {
   const toggleExpanded = useTerminalStore((s) => s.toggleExpanded)
   const setAutoScroll = useTerminalStore((s) => s.setAutoScroll)
   const clear = useTerminalStore((s) => s.clear)
-  const blockedScripts = useTerminalStore((s) => s.blockedScripts)
-  const allowingPkg = useTerminalStore((s) => s.allowingPkg)
-  const allowScript = useTerminalStore((s) => s.allowScript)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
@@ -93,29 +90,6 @@ export function TerminalDrawer() {
           <LogLine key={line.id} line={line} />
         ))}
       </div>
-
-      {/* Blocked scripts allow bar */}
-      {blockedScripts.size > 0 && (
-        <div className="shrink-0 px-3 py-2 bg-warn-surface/30 border-t border-warn-border/30">
-          <div className="text-[10px] text-warn mb-1.5">
-            ⚠ 以下包的安装脚本被 npm 安全策略拦截
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {Array.from(blockedScripts).map((pkg) => (
-              <div key={pkg} className="flex items-center gap-2 px-2 py-1 rounded-md bg-paper-2 border border-border-0">
-                <span className="font-mono text-xs text-text-secondary">{pkg}</span>
-                <button
-                  onClick={() => allowScript(pkg)}
-                  disabled={allowingPkg === pkg}
-                  className="px-2 py-0.5 text-[10px] bg-accent-dim hover:bg-accent text-white rounded disabled:opacity-40 transition-colors"
-                >
-                  {allowingPkg === pkg ? "放行中..." : "允许脚本"}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Scroll to bottom button */}
       {!autoScroll && (
