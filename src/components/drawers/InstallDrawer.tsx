@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useUIStore } from "../../stores/useUIStore"
 import { useTerminalStore } from "../../stores/useTerminalStore"
 import { usePackageStore } from "../../stores/usePackageStore"
+import { useProjectStore } from "../../stores/useProjectStore"
 import { useToastStore } from "../../stores/useToastStore"
 import { invoke } from "@tauri-apps/api/core"
 
@@ -64,8 +65,14 @@ export function InstallDrawer() {
         exact: exact,
       })
       // 事件监听器会自动调用 endOperation，这里不重复调用
-      usePackageStore.getState().lightRefresh()
-      usePackageStore.getState().fetchOutdated()
+      const pkgStore = usePackageStore.getState()
+      pkgStore.lightRefresh()
+      // 按当前模式刷新：全局模式查全局，本地模式查本地，避免 "No project open"
+      if (useProjectStore.getState().mode === "global") {
+        pkgStore.fetchGlobalOutdated()
+      } else {
+        pkgStore.fetchOutdated()
+      }
       useToastStore.getState().push(
         version ? `已安装 ${name}@${version}` : `已安装 ${name}`,
         "success"
