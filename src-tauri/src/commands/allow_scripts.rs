@@ -69,14 +69,22 @@ fn parse_scripts_has_scripts(stdout: &str) -> bool {
         Err(_) => return false,
     };
 
-    parsed
-        .as_object()
-        .map(|obj| {
-            ["postinstall", "preinstall", "install"]
-                .iter()
-                .any(|k| obj.get(*k).and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false))
-        })
-        .unwrap_or(false)
+    // npm view 的输出可能是对象 {postinstall:...} 或数组 [{postinstall:...},...]，两者都处理
+    let entries: Vec<&serde_json::Value> = match &parsed {
+        serde_json::Value::Array(arr) => arr.iter().collect(),
+        _ => vec![&parsed],
+    };
+
+    entries.iter().any(|entry| {
+        entry
+            .as_object()
+            .map(|obj| {
+                ["postinstall", "preinstall", "install"]
+                    .iter()
+                    .any(|k| obj.get(*k).and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false))
+            })
+            .unwrap_or(false)
+    })
 }
 
 #[tauri::command]
@@ -249,5 +257,18 @@ mod tests {
     #[test]
     fn test_scripts_invalid_json() {
         assert!(!parse_scripts_has_scripts("not json"));
+    }
+
+    #[test]
+    fn test_scripts_as_array() {
+        // npm view pkg@ver scripts --json 可能返回数组形式
+        let json = r#"[{"postinstall":"node scripts/install.js","test":"echo hi"}]"#;
+        assert!(parse_scripts_has_scripts(json));
+    }
+
+    #[test]
+    fn test_scripts_as_array_no_postinstall() {
+        let json = r#"[{"test":"echo hi","build":"vite build"}]"#;
+        assert!(!parse_scripts_has_scripts(json));
     }
 }
